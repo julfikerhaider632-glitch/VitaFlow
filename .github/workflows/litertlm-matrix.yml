@@ -1,0 +1,46 @@
+name: litertlm version matrix (temporary)
+
+on:
+  push:
+    paths:
+      - ".github/workflows/litertlm-matrix.yml"
+
+jobs:
+  try-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        litertlm: ["0.10.2", "0.11.0", "0.12.0", "0.13.1", "0.14.0", "0.15.0", "0.16.1", "0.17.1", "0.18.1"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - name: Pin litertlm ${{ matrix.litertlm }}
+        run: sed -i 's|version = "latest.release"|version = "${{ matrix.litertlm }}"|' gradle/libs.versions.toml && grep litertlm gradle/libs.versions.toml
+      - name: Build
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon 2>&1 | tee /tmp/build.log
+      - name: Annotate errors
+        if: failure()
+        run: |
+          grep -E "^e: " /tmp/build.log | grep -v "incompatible version of Kotlin" | sed -E 's#file:///[^ ]*/##' | head -25 > /tmp/e.txt || true
+          META=$(grep -c "incompatible version of Kotlin" /tmp/build.log || true)
+          WENT=$(grep -A4 "What went wrong" /tmp/build.log | head -8 || true)
+          MSG=$( { echo "Kotlin-metadata-incompat lines: $META"; cat /tmp/e.txt; echo "$WENT"; } | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')
+          echo "::error title=litertlm ${{ matrix.litertlm }} FAILED::${MSG}"
+      - name: Mark success
+        if: success()
+        run: echo "::notice title=litertlm ${{ matrix.litertlm }} OK::build succeeded"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: apk-litertlm-${{ matrix.litertlm }}
+          path: app/build/outputs/apk/debug/*.apk
