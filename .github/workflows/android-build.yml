@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
@@ -48,6 +51,18 @@ jobs:
           name: VitaFlow-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$APK" VitaFlow-debug.apk
+          gh release create "debug-${{ github.run_number }}" VitaFlow-debug.apk \
+            --target "${{ github.sha }}" --prerelease \
+            --title "VitaFlow debug build #${{ github.run_number }}" \
+            --notes "Debug APK built from commit ${{ github.sha }} (branch ${{ github.ref_name }}). Not signed for Play Store."
 
       - name: Upload build reports (on failure)
         if: failure()
