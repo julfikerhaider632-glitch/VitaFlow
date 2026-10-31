@@ -25,7 +25,22 @@ jobs:
           gradle-version: "8.10.2"
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee /tmp/build.log
+
+      - name: Surface errors as annotations
+        if: failure()
+        run: |
+          {
+            grep -nE "^e: |error:|FAILURE:|What went wrong|Could not (resolve|find|get)|Execution failed|Caused by|Unresolved reference|> " /tmp/build.log | head -60
+          } > /tmp/errors.txt || true
+          MSG=$(sed -e 's/%/%25/g' -e 's/\r//g' /tmp/errors.txt | awk 'BEGIN{ORS="%0A"}{print}')
+          echo "::error title=Gradle build errors::${MSG}"
+          echo "---- tail of build log ----"
+          tail -n 60 /tmp/build.log | sed -e 's/%/%25/g' > /tmp/tail.txt
+          MSG2=$(awk 'BEGIN{ORS="%0A"}{print}' /tmp/tail.txt)
+          echo "::error title=Build log tail::${MSG2}"
 
       - name: Upload APK
         if: success()
