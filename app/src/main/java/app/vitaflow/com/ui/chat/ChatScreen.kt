@@ -107,7 +107,7 @@ fun ChatScreen(account: AccountEntity, container: AppContainer, onNavigate: (Hom
 
     var afterGrant by remember { mutableStateOf<(() -> Unit)?>(null) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) afterGrant?.invoke() else vm.setStatus("মাইক্রোফোনের অনুমতি ছাড়া voice চলবে না")
+        if (granted) afterGrant?.invoke() else vm.updateStatus("মাইক্রোফোনের অনুমতি ছাড়া voice চলবে না")
         afterGrant = null
     }
     fun withMic(action: () -> Unit) {

@@ -102,7 +102,7 @@ class ChatViewModel(private val c: AppContainer, private val account: AccountEnt
         setCurrent(c.chatRepo.newConversation(account.id))
     }
 
-    fun setStatus(s: String?) {
+    fun updateStatus(s: String?) {
         status = s
     }
 
