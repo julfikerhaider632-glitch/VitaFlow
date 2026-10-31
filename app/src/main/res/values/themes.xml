@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.VitaFlow" parent="android:Theme.Material.NoActionBar" />
+</resources>

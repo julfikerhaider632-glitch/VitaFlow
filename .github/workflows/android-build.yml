@@ -1,0 +1,75 @@
+name: Android Build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build debug APK
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee /tmp/build.log
+
+      - name: Surface errors as annotations
+        if: failure()
+        run: |
+          {
+            grep -nE "^e: |error:|FAILURE:|What went wrong|Could not (resolve|find|get)|Execution failed|Caused by|Unresolved reference|> " /tmp/build.log | head -60
+          } > /tmp/errors.txt || true
+          MSG=$(sed -e 's/%/%25/g' -e 's/\r//g' /tmp/errors.txt | awk 'BEGIN{ORS="%0A"}{print}')
+          echo "::error title=Gradle build errors::${MSG}"
+          echo "---- tail of build log ----"
+          tail -n 60 /tmp/build.log | sed -e 's/%/%25/g' > /tmp/tail.txt
+          MSG2=$(awk 'BEGIN{ORS="%0A"}{print}' /tmp/tail.txt)
+          echo "::error title=Build log tail::${MSG2}"
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VitaFlow-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$APK" VitaFlow-debug.apk
+          gh release create "debug-${{ github.run_number }}" VitaFlow-debug.apk \
+            --target "${{ github.sha }}" --prerelease \
+            --title "VitaFlow debug build #${{ github.run_number }}" \
+            --notes "Debug APK built from commit ${{ github.sha }} (branch ${{ github.ref_name }}). Not signed for Play Store."
+
+      - name: Upload build reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            app/build/reports/
+            app/build/outputs/logs/
+          if-no-files-found: ignore
