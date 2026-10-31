@@ -2,7 +2,6 @@ name: Android Build
 
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -23,6 +22,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
+
+      - name: PROBE litertlm versions
+        run: |
+          curl -fsSL https://dl.google.com/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml -o /tmp/meta.xml || true
+          V=$(grep -o "<version>[^<]*" /tmp/meta.xml | sed 's/<version>//' | tr '\n' ' ')
+          echo "::notice title=litertlm versions::${V}"
 
       - name: Build debug APK
         run: |
